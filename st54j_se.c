@@ -1,4 +1,4 @@
-/* drivers/nfc/ese/st54j.c
+/* drivers/nfc/ese/st54j_se.c
  * Copyright (C) 2018 ST Microelectronics S.A.
  * Copyright 2017 Google Inc.
  *
@@ -33,10 +33,9 @@
 #include <linux/compat.h>
 #endif
 
-
-
 #include "../st21nfc.h"
 
+#define DRIVER_VERSION "1.0.2"
 #define ST54_MAX_BUF 258U
 
 struct ese_dev {
@@ -78,9 +77,10 @@ static int ese_open(struct inode *inode, struct file *filp)
 {
 	struct ese_dev *ese_dev = container_of(filp->private_data,
 				struct ese_dev, device);
-dev_err(&ese_dev->spi->dev,
+				
+	dev_info(&ese_dev->spi->dev,
 			"%s: enter\n", __func__);
-			pr_err("%s : open st54j \n", __func__);
+			pr_err("%s : open st54j_se \n", __func__);
 	mutex_lock(&ese_dev->mutex);
 	/* Find the NFC parent device if it exists. */
 	if (ese_dev->nfcc_data == NULL) {
@@ -110,7 +110,7 @@ dev_err(&ese_dev->spi->dev,
 
 	filp->private_data = ese_dev;
 	dev_dbg(&ese_dev->spi->dev,
-			"%s: opened st54j\n", __func__);
+			"%s: opened st54j_se\n", __func__);
 
 
 	return 0;
@@ -222,7 +222,7 @@ static int st54j_probe(struct spi_device *spi)
 	struct device_node *np = dev_of_node(&spi->dev);
 	int ret;
 
-	dev_dbg(&spi->dev, "%s: st54j nfc called\n", __func__);
+	dev_dbg(&spi->dev, "%s entry\n", __func__);
 
 	if (!np) {
 		dev_err(&spi->dev, "%s: device tree data missing\n", __func__);
@@ -235,7 +235,7 @@ static int st54j_probe(struct spi_device *spi)
 
 	ese_dev->spi = spi;
 	ese_dev->device.minor = MISC_DYNAMIC_MINOR;
-	ese_dev->device.name = "st54j";
+	ese_dev->device.name = "st54j_se";
 	ese_dev->device.fops = &ese_dev_fops;
 
 	spi->bits_per_word = 8;
@@ -292,14 +292,14 @@ err:
 }
 
 static const struct of_device_id st54j_match_table[] = {
-	{ .compatible = "st,st54j" },
+	{ .compatible = "st,st54j_se" },
 	{ }
 };
 MODULE_DEVICE_TABLE(of, st54j_match_table);
 
 static struct spi_driver st54j_driver = {
 	.driver = {
-		.name = "st54j",
+		.name = "st54j_se",
 		.of_match_table = st54j_match_table,
 	},
 	.probe = st54j_probe,
@@ -308,6 +308,7 @@ static struct spi_driver st54j_driver = {
 module_spi_driver(st54j_driver);
 
 MODULE_DESCRIPTION("ST54J eSE driver");
-MODULE_ALIAS("spi:st54j");
-MODULE_AUTHOR("Google Inc");
+MODULE_ALIAS("spi:st54j_se");
+MODULE_AUTHOR("ST Microelectronics");
 MODULE_LICENSE("GPL");
+MODULE_VERSION(DRIVER_VERSION);
