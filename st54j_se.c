@@ -41,9 +41,10 @@
 #include <linux/compat.h>
 #endif
 
+#include "st54j_se.h"
 #include "../st21nfc.h"
 
-#define DRIVER_VERSION "1.0.2"
+#define DRIVER_VERSION "1.1.1"
 #define ST54_MAX_BUF 258U
 
 struct ese_dev {
@@ -53,6 +54,7 @@ struct ese_dev {
 	struct mutex		mutex;
 	struct	miscdevice	device;
 	const char		*nfcc_name;
+	unsigned int ese_reset_gpio;
 };
 
 #ifdef CONFIG_COMPAT
@@ -76,7 +78,29 @@ static long ese_ioctl(struct file *filp, unsigned int cmd,
 	int r = 0;
 	struct ese_dev *ese_dev = filp->private_data;
 	mutex_lock(&ese_dev->mutex);
-
+	dev_info(&ese_dev->spi->dev,
+			"%s: enter, cmd=%d\n", __func__, cmd);
+			
+	switch (cmd) {
+		case ST54J_SE_RESET:
+			pr_info("%s  Reset Request received\n", __func__);
+			if (ese_dev->ese_reset_gpio != 0) {
+				/* if GPIO was equal to 0 (following power ON), first ensure it is high during 20ms */
+				if (gpio_get_value(ese_dev->ese_reset_gpio) == 0)
+				{
+					pr_info("%s detects ese_reset_gpio to low, first force to high for 20ms\n", __func__);
+					gpio_set_value(ese_dev->ese_reset_gpio, 1);
+					msleep(20);
+				}
+				/* pulse low for 20 millisecs */
+				gpio_set_value(ese_dev->ese_reset_gpio, 0);
+				msleep(20);
+				gpio_set_value(ese_dev->ese_reset_gpio, 1);
+				pr_info("%s sent Reset request on eSE\n", __func__);
+			}
+		break;
+	}
+			
 	mutex_unlock(&ese_dev->mutex);
 	return r;
 }
@@ -248,6 +272,29 @@ static int st54j_probe(struct spi_device *spi)
 
 	spi->bits_per_word = 8;
 
+	ese_dev->ese_reset_gpio = of_get_named_gpio(np, "st,ese_reset_gpio", 0);
+	if (!gpio_is_valid(ese_dev->ese_reset_gpio)) {
+		pr_err("[dsc]%s: fail to get ese_reset_gpio\n", __func__);
+		return -EINVAL;
+		goto err;
+	}
+	pr_err("[dsc]%s : get ese_reset_gpio[%d]\n", __func__, ese_dev->ese_reset_gpio);
+
+	ret = gpio_request(ese_dev->ese_reset_gpio, "ese_reset_gpio");
+	if (ret) {
+		pr_err("%s : ese_reset_gpio gpio_request failed\n", __FILE__);
+		ret = -ENODEV;
+		goto err;
+	}
+	
+	/* Configure as output, initial low state */
+	ret = gpio_direction_output(ese_dev->ese_reset_gpio, 0);
+	if (ret) {
+		pr_err("%s : ese_reset_gpio gpio_direction_output failed\n",
+		       __FILE__);
+		ret = -ENODEV;
+		goto err;
+	}
 
 	mutex_init(&ese_dev->mutex);
 	ret = of_property_read_string(np, "st,nfcc", &ese_dev->nfcc_name);
