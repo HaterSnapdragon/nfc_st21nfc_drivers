@@ -45,10 +45,14 @@
 
 #define MAX_BUFFER_SIZE 260
 
-#define DRIVER_VERSION "2.0.3"
+#define DRIVER_VERSION "2.0.4"
 
 /* prototypes */
 static irqreturn_t st21nfc_dev_irq_handler(int irq, void *dev_id);
+#ifdef NO_CRYSTAL
+static irqreturn_t st21nfc_clkreq_irq_handler(int irq, void *dev_id);
+#endif
+
 /*
  * The platform data member 'polarity_mode' defines
  * how the wakeup pin is configured and handled.
@@ -83,6 +87,7 @@ struct st21nfc_dev {
 	/* CLK control */
 	bool			clk_run;
 	struct	clk		*s_clk;
+	int irqNumberClkReq;
 #endif
 };
 
@@ -136,6 +141,33 @@ static int st_clock_deselect(struct st21nfc_dev *st21nfc_dev)
 		return 0;
 	}
 	return r;
+}
+
+static irqreturn_t st21nfc_clkreq_irq_handler(int irq, void *dev_id)
+{
+	struct st21nfc_dev *st21nfc_dev = dev_id;
+	int value = 0;
+	int ret = 0;
+
+	pr_debug("%s : enter\n", __func__);
+
+	value = gpio_get_value(st21nfc_dev->platform_data.clkreq_gpio);
+
+	if (value > 0) {
+		value = 1;
+		ret = st_clock_select(st21nfc_dev);
+		if (ret < 0)
+			pr_err("%s : st_clock_select failed\n", __FILE__);
+	} else {
+		value = 0;
+		ret = st_clock_deselect(st21nfc_dev);
+		if (ret < 0)
+			pr_err("%s : st_clock_deselect failed\n", __FILE__);
+	}
+
+	pr_debug("%s get gpio result %d\n", __func__, value);
+
+	return IRQ_HANDLED;
 }
 #endif
 
@@ -686,6 +718,25 @@ static int st21nfc_probe(struct i2c_client *client,
 		gpio_set_value(st21nfc_dev->platform_data.reset_gpio, 1);
 	}
 
+#ifdef NO_CRYSTAL
+    /* handle clk_req irq */
+	st21nfc_dev->irqNumberClkReq = gpio_to_irq(platform_data->clkreq_gpio);
+
+	ret = irq_set_irq_type(st21nfc_dev->irqNumberClkReq, IRQ_TYPE_EDGE_BOTH);
+
+	if (ret)
+		pr_err("%s : irq_set_irq_type for clkreq failed\n", __FILE__);
+
+	// This next call requests an interrupt line
+	ret = request_irq(st21nfc_dev->irqNumberClkReq,
+						(irq_handler_t) st21nfc_clkreq_irq_handler,
+						IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING, // Interrupt on both edges
+						"st21nfc_clkreq_handler",
+						st21nfc_dev);
+	if (ret)
+		pr_err("%s : request_irq for clkreq failed\n", __FILE__);
+
+#endif
 	client->irq = gpio_to_irq(platform_data->irq_gpio);
 
 	enable_irq_wake(client->irq);
