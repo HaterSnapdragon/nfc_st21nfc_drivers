@@ -63,6 +63,7 @@ static long ese_compat_ioctl(struct file *filp, unsigned int cmd,
 {
 	long r = 0;
 	struct ese_dev *ese_dev = filp->private_data;
+
 	mutex_lock(&ese_dev->mutex);
 
 	arg = (compat_u64)arg;
@@ -77,30 +78,30 @@ static long ese_ioctl(struct file *filp, unsigned int cmd,
 {
 	int r = 0;
 	struct ese_dev *ese_dev = filp->private_data;
+
 	mutex_lock(&ese_dev->mutex);
 	dev_info(&ese_dev->spi->dev,
 			"%s: enter, cmd=%d\n", __func__, cmd);
-			
+
 	switch (cmd) {
-		case ST54J_SE_RESET:
-			pr_info("%s  Reset Request received\n", __func__);
-			if (ese_dev->ese_reset_gpio != 0) {
-				/* if GPIO was equal to 0 (following power ON), first ensure it is high during 20ms */
-				if (gpio_get_value(ese_dev->ese_reset_gpio) == 0)
-				{
-					pr_info("%s detects ese_reset_gpio to low, first force to high for 20ms\n", __func__);
-					gpio_set_value(ese_dev->ese_reset_gpio, 1);
-					msleep(20);
-				}
-				/* pulse low for 20 millisecs */
-				gpio_set_value(ese_dev->ese_reset_gpio, 0);
-				msleep(20);
+	case ST54J_SE_RESET:
+		pr_info("%s  Reset Request received\n", __func__);
+		if (ese_dev->ese_reset_gpio != 0) {
+			/* if GPIO was equal to 0 (following power ON), first ensure it is high during 20ms */
+			if (gpio_get_value(ese_dev->ese_reset_gpio) == 0) {
+				pr_info("%s detects ese_reset_gpio to low, first force to high for 20ms\n", __func__);
 				gpio_set_value(ese_dev->ese_reset_gpio, 1);
-				pr_info("%s sent Reset request on eSE\n", __func__);
+				msleep(20);
 			}
+			/* pulse low for 20 millisecs */
+			gpio_set_value(ese_dev->ese_reset_gpio, 0);
+			msleep(20);
+			gpio_set_value(ese_dev->ese_reset_gpio, 1);
+			pr_info("%s sent Reset request on eSE\n", __func__);
+		}
 		break;
 	}
-			
+
 	mutex_unlock(&ese_dev->mutex);
 	return r;
 }
@@ -109,10 +110,10 @@ static int ese_open(struct inode *inode, struct file *filp)
 {
 	struct ese_dev *ese_dev = container_of(filp->private_data,
 				struct ese_dev, device);
-				
+
 	dev_info(&ese_dev->spi->dev,
 			"%s: enter\n", __func__);
-			pr_err("%s : open st54j_se \n", __func__);
+	pr_err("%s : open st54j_se\n", __func__);
 	mutex_lock(&ese_dev->mutex);
 	/* Find the NFC parent device if it exists. */
 	if (ese_dev->nfcc_data == NULL) {
@@ -286,7 +287,7 @@ static int st54j_probe(struct spi_device *spi)
 		ret = -ENODEV;
 		goto err;
 	}
-	
+
 	/* Configure as output, initial low state */
 	ret = gpio_direction_output(ese_dev->ese_reset_gpio, 0);
 	if (ret) {
@@ -366,4 +367,3 @@ MODULE_DESCRIPTION("ST54J eSE driver");
 MODULE_ALIAS("spi:st54j_se");
 MODULE_AUTHOR("ST Microelectronics");
 MODULE_LICENSE("GPL");
-MODULE_VERSION(DRIVER_VERSION);
