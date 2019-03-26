@@ -18,21 +18,22 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifndef __ST21NFC_H
-#define __ST21NFC_H
+#ifndef _ST21NFC_H_
+#define _ST21NFC_H_
 
-#define ST21NFC_MAGIC	0xEA
-
-#define ST21NFC_NAME "st21nfc"
 /*
- * ST21NFC power control via ioctl
- * ST21NFC_GET_WAKEUP :  poll gpio-level for Wakeup pin
+ * The platform data member 'polarity_mode' defines
+ * how the wakeup pin is configured and handled.
+ * it can take the following values :
+ *	 IRQF_TRIGGER_RISING
+ *   IRQF_TRIGGER_HIGH
  */
-#define ST21NFC_GET_WAKEUP	      _IOR(ST21NFC_MAGIC, 0x01, unsigned int)
-#define ST21NFC_PULSE_RESET		_IOR(ST21NFC_MAGIC, 0x02, unsigned int)
-#define ST21NFC_SET_POLARITY_RISING   _IOR(ST21NFC_MAGIC, 0x03, unsigned int)
-#define ST21NFC_SET_POLARITY_HIGH     _IOR(ST21NFC_MAGIC, 0x05, unsigned int)
-#define ST21NFC_GET_POLARITY	      _IOR(ST21NFC_MAGIC, 0x07, unsigned int)
-#define ST21NFC_RECOVERY              _IOR(ST21NFC_MAGIC, 0x08, unsigned int)
+struct st21nfc_platform_data {
+	unsigned int irq_gpio;		/* GPIO for NFCC IRQ pin (input) */
+	unsigned int reset_gpio;	/* GPIO for NFCC Reset pin (output) */
+	unsigned int clkreq_gpio;	/* GPIO for NFCC CLK_REQ pin (input) */
+	unsigned int pidle_gpio; 	/* GPIO for NFCC CLF_MONITOR_PWR (input) */
+	unsigned int polarity_mode; 	/* irq_gpio polarity to be used */
+};
 
 #endif
